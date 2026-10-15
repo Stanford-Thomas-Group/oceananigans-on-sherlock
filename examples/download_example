@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# Usage: download_example <example_name>
+# Creates (or wipes clean) <example_name>/ and downloads <example_name>.jl into it
+# from the Oceananigans.jl examples folder.
+set -euo pipefail
+
+if [ $# -ne 1 ] || [ -z "$1" ]; then
+    echo "Usage: $(basename "$0") <example_name>" >&2
+    exit 1
+fi
+
+name="${1%.jl}"   # allow "internal_wave" or "internal_wave.jl"
+url="https://raw.githubusercontent.com/CliMA/Oceananigans.jl/main/examples/${name}.jl"
+
+# Download to a temp file first so a failed download doesn't wipe an existing directory
+tmp=$(mktemp)
+trap 'rm -f "$tmp"' EXIT
+
+if ! wget -q -O "$tmp" "$url"; then
+    echo "Error: could not download $url" >&2
+    exit 1
+fi
+
+# Put download in a directory alongside this script
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+dest="$script_dir/$name"
+
+rm -rf -- "$dest"
+mkdir -- "$dest"
+mv "$tmp" "$dest/$name.jl"
+
+echo "Downloaded $name.jl into $dest/"
