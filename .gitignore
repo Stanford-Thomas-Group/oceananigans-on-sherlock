@@ -30,4 +30,11 @@ docs/site/
 # Examples directory
 examples/*
 !examples/download_example
+!examples/mixed_layer_instability/
 
+# Output files
+*.jld2
+*.mp4
+
+#vscode
+.vscode/
