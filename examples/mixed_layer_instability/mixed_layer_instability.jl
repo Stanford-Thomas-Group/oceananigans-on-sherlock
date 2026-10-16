@@ -24,8 +24,8 @@ using CairoMakie
 arch = Distributed(GPU(); partition=Partition(x=2))
 rank = arch.local_rank
 
-@info @sprintf("Rank %d on %s: CUDA_VISIBLE_DEVICES=%s, using %s",
-               rank, gethostname(), get(ENV, "CUDA_VISIBLE_DEVICES", "unset"), CUDA.device())
+@info @sprintf("Rank %d on %s: CUDA_VISIBLE_DEVICES=%s, using %s (uuid %s)",
+               rank, gethostname(), get(ENV, "CUDA_VISIBLE_DEVICES", "unset"), CUDA.device(), CUDA.uuid(CUDA.device()))
 
 # Grid: periodic along the front, bounded across it and in depth.
 # Halo is the minimum required by 5th-order WENO everywhere -- halo width sets the
@@ -48,7 +48,7 @@ T_bcs = FieldBoundaryConditions(top=FluxBoundaryCondition(Jᵀ))
 
 equation_of_state = LinearEquationOfState(thermal_expansion=2e-4, haline_contraction=7.8e-4)
 
-model = HydrostaticFreeSurfaceModel(; grid,
+model = HydrostaticFreeSurfaceModel(grid;
                                      free_surface = SplitExplicitFreeSurface(grid, substeps=30),
                                      coriolis = FPlane(f=1e-4),
                                      buoyancy = SeawaterBuoyancy(; equation_of_state),
