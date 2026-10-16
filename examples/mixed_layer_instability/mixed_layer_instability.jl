@@ -112,7 +112,7 @@ simulation.output_writers[:surface] = JLD2Writer(model, outputs;
                                                   filename = "mli_surface.jld2",
                                                   indices = (:, :, grid.Nz),
                                                   schedule = TimeInterval(15minutes),
-                                                  overwrite_existing = true)
+                                                  overwrite_files = true)
 
 @root @info "Running MLI simulation on $(MPI.Comm_size(MPI.COMM_WORLD)) ranks..."
 
