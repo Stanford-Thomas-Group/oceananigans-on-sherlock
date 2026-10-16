@@ -55,7 +55,7 @@ model = HydrostaticFreeSurfaceModel(grid;
                                      free_surface = SplitExplicitFreeSurface(grid, substeps=30),
                                      coriolis = FPlane(f=1e-4),
                                      buoyancy = SeawaterBuoyancy(; equation_of_state),
-                                     tracers = (:T, :S, :e, :ϵ),
+                                     tracers = (:T, :S),  # :e, :ϵ are added automatically by the closure
                                      closure = TKEDissipationVerticalDiffusivity(),
                                      momentum_advection = WENOVectorInvariant(order=5),
                                      tracer_advection = WENO(order=5),
