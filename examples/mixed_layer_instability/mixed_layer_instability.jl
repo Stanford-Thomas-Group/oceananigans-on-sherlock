@@ -123,7 +123,7 @@ uᵢ(x, y, z) = (g * β * ΔS / f) * ramp_derivative(y, Δy_front) * depth_mask_
 # no motion" technique): η(y) = (1/g) ∫_{-mld}^0 b dy, which integrates in closed form to
 # the expression below (dropping the y-independent terms from T(z) and the S background,
 # which don't affect the dynamics).
-ηᵢ(x, y) = -β * ΔS * mld/2 * ramp(y, Δy_front)
+ηᵢ(x, y, z) = -β * ΔS * mld/2 * ramp(y, Δy_front)
 
 set!(model, T=Tᵢ, S=Sᵢ, u=uᵢ, η=ηᵢ, e=1e-6)
 
