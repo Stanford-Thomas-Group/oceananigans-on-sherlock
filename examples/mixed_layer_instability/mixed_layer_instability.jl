@@ -50,6 +50,7 @@ Jᵀ = Q / (ρ₀ * cᴾ)
 T_bcs = FieldBoundaryConditions(top=FluxBoundaryCondition(Jᵀ))
 
 equation_of_state = LinearEquationOfState(thermal_expansion=2e-4, haline_contraction=7.8e-4)
+f = 1e-4  # Coriolis parameter, s⁻¹
 
 # At this domain size and depth, the barotropic gravity wave speed (~38 m/s) caps the
 # stable outer Δt for a 30-substep split-explicit free surface at roughly 30 seconds --
@@ -62,8 +63,15 @@ equation_of_state = LinearEquationOfState(thermal_expansion=2e-4, haline_contrac
 max_Δt = 30seconds
 
 model = HydrostaticFreeSurfaceModel(grid;
-                                     free_surface = SplitExplicitFreeSurface(grid, substeps=30),
-                                     coriolis = FPlane(f=1e-4),
+                                     # 60, not 30: with Δt=30s that's a 0.5s barotropic substep, a
+                                     # comfortable margin below the ~1.36s forward-backward stability
+                                     # limit implied by this domain's gravity wave speed and grid
+                                     # spacing -- 30 substeps (1s) left only ~25% margin, which the
+                                     # initial release-from-rest transient (an instantaneous pressure
+                                     # imbalance that radiates fast barotropic waves well before the
+                                     # much slower ~f⁻¹ geostrophic adjustment) can plausibly exceed.
+                                     free_surface = SplitExplicitFreeSurface(grid, substeps=60),
+                                     coriolis = FPlane(; f),
                                      buoyancy = SeawaterBuoyancy(; equation_of_state),
                                      tracers = (:T, :S),  # :e, :ϵ are added automatically by the closure
                                      closure = TKEDissipationVerticalDiffusivity(),
@@ -72,10 +80,15 @@ model = HydrostaticFreeSurfaceModel(grid;
                                      boundary_conditions = (T=T_bcs,))
 
 # Initial conditions: T(z) alone sets the background stratification N², S(x,y,z) alone
-# carries the horizontal front, confined to the mixed layer depth. No initial velocity --
-# geostrophic adjustment and a small noise seed grow the instability from rest.
+# carries the horizontal front, confined to the mixed layer depth. The along-front velocity
+# u is initialized in thermal wind balance with the front (plus a small noise seed) rather
+# than from rest -- starting unbalanced would force the model to generate the entire thermal
+# wind shear from scratch via a violent initial adjustment that radiates fast barotropic
+# waves, which is a much rougher transient for the free surface than the baroclinic
+# instability growth we actually want to showcase.
 g = model.buoyancy.formulation.gravitational_acceleration
 α = equation_of_state.thermal_expansion
+β = equation_of_state.haline_contraction
 
 N²   = 1e-5          # background stratification, s⁻²
 dTdz = N² / (g * α)
@@ -86,12 +99,19 @@ mld      = 75meters
 noise    = 1e-3
 
 ramp(y, Δy) = min(max(0, y / Δy + 1/2), 1)
+ramp_derivative(y, Δy) = -Δy/2 < y < Δy/2 ? 1/Δy : 0
+
 depth_mask(z, h) = min(max(1 + z / h, 0), 1)
+depth_mask_integral(z, h) = (z = clamp(z, -h, 0); z + z^2 / (2h) + h/2)
 
 Tᵢ(x, y, z) = 20 + dTdz * z + noise * randn()
 Sᵢ(x, y, z) = 35 + ΔS * ramp(y, Δy_front) * depth_mask(z, mld) + noise * randn()
 
-set!(model, T=Tᵢ, S=Sᵢ, e=1e-6)
+# Thermal wind balance: f ∂u/∂z = -∂b/∂y = gβ ∂S/∂y, integrated upward from u=0 below the
+# mixed layer (where the front vanishes).
+uᵢ(x, y, z) = (g * β * ΔS / f) * ramp_derivative(y, Δy_front) * depth_mask_integral(z, mld)
+
+set!(model, T=Tᵢ, S=Sᵢ, u=uᵢ, e=1e-6)
 
 simulation = Simulation(model, Δt=30seconds, stop_time=12hours)
 conjure_time_step_wizard!(simulation, IterationInterval(10), cfl=0.3, max_Δt=max_Δt)

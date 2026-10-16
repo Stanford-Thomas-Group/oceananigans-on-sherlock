@@ -19,6 +19,16 @@ A collection of tips and example projects for running Oceananigans on Stanford's
     - There is a substantial overhead and it can be finicky.
         - For example, the Sherlock version of OpenMPI is quite old and incompatible with the Julia NCDatasets package. Although Oceananigans supports writing output to netcdf via NCDatasets, this is not available to us for distributed computations. Not that this is a particularly big loss, JLD2 is the recommended output format in any case.
 - Refer to the [general Julia advice](https://github.com/Stanford-Thomas-Group/julia-best-practices) for instructions on how to set up CUDA and MPI in a new project.
+- The ``Project.toml`` and ``LocalPreferences.toml`` are already set up for _Sherlock_ so you should be able to simply load the openmpi module, set the environment variables and start a Julia instance
+    ```bash
+    $ module load openmpi/5.0.5
+    $ export UCX_ERROR_SIGNALS="SIGILL,SIGBUS,SIGFPE"
+    $ julia --project
+    ```
+    and then instantiate the project. In **Package Mode** run 
+    ```julia
+    (oceananigans-on-sherlock) pkg> instantiate
+    ```
 
 # Examples from the Oceananigans GitHub
 
