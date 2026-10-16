@@ -30,12 +30,15 @@ rank = arch.local_rank
 # Grid: periodic along the front, bounded across it and in depth.
 # Halo is the minimum required by 5th-order WENO everywhere -- halo width sets the
 # per-step MPI communication volume between the two ranks, so it isn't padded.
+# (4, 4, 3) rather than (3, 3, 3): WENOVectorInvariant's vorticity reconstruction uses
+# a VelocityStencil, which needs one extra halo point in the horizontal directions
+# beyond a bare order-5 WENO reconstruction.
 Nx, Ny, Nz = 192, 192, 48
 Lx, Ly, Lz = 10kilometers, 10kilometers, 150meters
 
 grid = RectilinearGrid(arch; size=(Nx, Ny, Nz),
                         x=(0, Lx), y=(-Ly/2, Ly/2), z=(-Lz, 0),
-                        halo=(3, 3, 3),
+                        halo=(4, 4, 3),
                         topology=(Periodic, Bounded, Bounded))
 
 # Surface cooling: a destabilizing heat flux that competes with MLI restratification.
