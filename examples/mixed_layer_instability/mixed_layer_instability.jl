@@ -102,7 +102,12 @@ ramp(y, Δy) = min(max(0, y / Δy + 1/2), 1)
 ramp_derivative(y, Δy) = -Δy/2 < y < Δy/2 ? 1/Δy : 0
 
 depth_mask(z, h) = min(max(1 + z / h, 0), 1)
-depth_mask_integral(z, h) = (z = clamp(z, -h, 0); z + z^2 / (2h) + h/2)
+
+# ∫_{-h}^{z} depth_mask(z', h) dz'
+function depth_mask_integral(z, h)
+    z_clamped = clamp(z, -h, 0)
+    return z_clamped + z_clamped^2 / (2h) + h/2
+end
 
 Tᵢ(x, y, z) = 20 + dTdz * z + noise * randn()
 Sᵢ(x, y, z) = 35 + ΔS * ramp(y, Δy_front) * depth_mask(z, mld) + noise * randn()
@@ -111,7 +116,16 @@ Sᵢ(x, y, z) = 35 + ΔS * ramp(y, Δy_front) * depth_mask(z, mld) + noise * ran
 # mixed layer (where the front vanishes).
 uᵢ(x, y, z) = (g * β * ΔS / f) * ramp_derivative(y, Δy_front) * depth_mask_integral(z, mld)
 
-set!(model, T=Tᵢ, S=Sᵢ, u=uᵢ, e=1e-6)
+# The thermal wind shear above only balances u relative to the u=0 reference at z=-mld --
+# it says nothing about the free surface, so η=0 (the default) would leave the barotropic
+# (depth-independent) part of the flow unbalanced. Matching η to the dynamic height relative
+# to that same z=-mld reference level completes the geostrophic balance (standard "level of
+# no motion" technique): η(y) = (1/g) ∫_{-mld}^0 b dy, which integrates in closed form to
+# the expression below (dropping the y-independent terms from T(z) and the S background,
+# which don't affect the dynamics).
+ηᵢ(x, y) = -β * ΔS * mld/2 * ramp(y, Δy_front)
+
+set!(model, T=Tᵢ, S=Sᵢ, u=uᵢ, η=ηᵢ, e=1e-6)
 
 simulation = Simulation(model, Δt=30seconds, stop_time=12hours)
 conjure_time_step_wizard!(simulation, IterationInterval(10), cfl=0.3, max_Δt=max_Δt)
