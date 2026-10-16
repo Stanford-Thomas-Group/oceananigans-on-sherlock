@@ -51,13 +51,18 @@ T_bcs = FieldBoundaryConditions(top=FluxBoundaryCondition(Jᵀ))
 
 equation_of_state = LinearEquationOfState(thermal_expansion=2e-4, haline_contraction=7.8e-4)
 
-# Largest Δt the time step wizard is allowed to reach (set below) -- the free surface's
-# barotropic substeps are sized for this value so it stays stable even as Δt grows from
-# its small initial value toward this cap.
-max_Δt = 5minutes
+# At this domain size and depth, the barotropic gravity wave speed (~38 m/s) caps the
+# stable outer Δt for a 30-substep split-explicit free surface at roughly 30 seconds --
+# that's the binding constraint here, not advective CFL. So the time step wizard (below)
+# is capped at the same value: it can shrink Δt if advective CFL ever demands it once
+# eddies develop, but never grow past what the free surface can support. (Sizing substeps
+# from a larger target Δt instead blows up the required inter-rank communication halo --
+# e.g. a 5-minute target needs ~600+ substeps, well beyond what a 96-point local grid
+# can support.)
+max_Δt = 30seconds
 
 model = HydrostaticFreeSurfaceModel(grid;
-                                     free_surface = SplitExplicitFreeSurface(grid; cfl=0.7, fixed_Δt=max_Δt),
+                                     free_surface = SplitExplicitFreeSurface(grid, substeps=30),
                                      coriolis = FPlane(f=1e-4),
                                      buoyancy = SeawaterBuoyancy(; equation_of_state),
                                      tracers = (:T, :S),  # :e, :ϵ are added automatically by the closure
