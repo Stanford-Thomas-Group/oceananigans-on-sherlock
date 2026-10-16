@@ -51,8 +51,13 @@ T_bcs = FieldBoundaryConditions(top=FluxBoundaryCondition(Jᵀ))
 
 equation_of_state = LinearEquationOfState(thermal_expansion=2e-4, haline_contraction=7.8e-4)
 
+# Largest Δt the time step wizard is allowed to reach (set below) -- the free surface's
+# barotropic substeps are sized for this value so it stays stable even as Δt grows from
+# its small initial value toward this cap.
+max_Δt = 5minutes
+
 model = HydrostaticFreeSurfaceModel(grid;
-                                     free_surface = SplitExplicitFreeSurface(grid, substeps=30),
+                                     free_surface = SplitExplicitFreeSurface(grid; cfl=0.7, fixed_Δt=max_Δt),
                                      coriolis = FPlane(f=1e-4),
                                      buoyancy = SeawaterBuoyancy(; equation_of_state),
                                      tracers = (:T, :S),  # :e, :ϵ are added automatically by the closure
@@ -84,7 +89,7 @@ Sᵢ(x, y, z) = 35 + ΔS * ramp(y, Δy_front) * depth_mask(z, mld) + noise * ran
 set!(model, T=Tᵢ, S=Sᵢ, e=1e-6)
 
 simulation = Simulation(model, Δt=30seconds, stop_time=12hours)
-conjure_time_step_wizard!(simulation, IterationInterval(10), cfl=0.3, max_Δt=5minutes)
+conjure_time_step_wizard!(simulation, IterationInterval(10), cfl=0.3, max_Δt=max_Δt)
 
 wall_clock = Ref(time_ns())
 
@@ -163,7 +168,7 @@ MPI.Barrier(MPI.COMM_WORLD)
 
     Label(fig[1, 1:2], title, fontsize=20, tellwidth=false)
 
-    record(fig, "mixed_layer_instability.mp4", 1:Nt, framerate=8) do i
+    CairoMakie.record(fig, "mixed_layer_instability.mp4", 1:Nt, framerate=8) do i
         n[] = i
     end
 
