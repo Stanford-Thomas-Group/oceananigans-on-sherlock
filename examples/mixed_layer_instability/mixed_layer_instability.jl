@@ -34,7 +34,7 @@ rank = arch.local_rank
 # a VelocityStencil, which needs one extra halo point in the horizontal directions
 # beyond a bare order-5 WENO reconstruction.
 Nx, Ny, Nz = 192, 192, 48
-Lx, Ly, Lz = 10kilometers, 10kilometers, 150meters
+Lx, Ly, Lz = 20kilometers, 20kilometers, 150meters
 
 grid = RectilinearGrid(arch; size=(Nx, Ny, Nz),
                         x=(0, Lx), y=(-Ly/2, Ly/2), z=(-Lz, 0),
@@ -52,24 +52,25 @@ T_bcs = FieldBoundaryConditions(top=FluxBoundaryCondition(Jᵀ))
 equation_of_state = LinearEquationOfState(thermal_expansion=2e-4, haline_contraction=7.8e-4)
 f = 1e-4  # Coriolis parameter, s⁻¹
 
-# At this domain size and depth, the barotropic gravity wave speed (~38 m/s) caps the
-# stable outer Δt for a 30-substep split-explicit free surface at roughly 30 seconds --
-# that's the binding constraint here, not advective CFL. So the time step wizard (below)
-# is capped at the same value: it can shrink Δt if advective CFL ever demands it once
-# eddies develop, but never grow past what the free surface can support. (Sizing substeps
-# from a larger target Δt instead blows up the required inter-rank communication halo --
-# e.g. a 5-minute target needs ~600+ substeps, well beyond what a 96-point local grid
-# can support.)
+# The barotropic gravity wave speed here (~38 m/s) is the binding constraint on the stable
+# outer Δt for the split-explicit free surface (below), not advective CFL -- so the time
+# step wizard is capped at the same value: it can shrink Δt if advective CFL ever demands
+# it once eddies develop, but never grow past what the free surface can support. (Sizing
+# substeps from a larger target Δt instead blows up the required inter-rank communication
+# halo -- e.g. a 5-minute target needs hundreds of substeps, well beyond what a 96-point
+# local grid can support.)
 max_Δt = 30seconds
 
 model = HydrostaticFreeSurfaceModel(grid;
-                                     # 60, not 30: with Δt=30s that's a 0.5s barotropic substep, a
-                                     # comfortable margin below the ~1.36s forward-backward stability
-                                     # limit implied by this domain's gravity wave speed and grid
-                                     # spacing -- 30 substeps (1s) left only ~25% margin, which the
-                                     # initial release-from-rest transient (an instantaneous pressure
-                                     # imbalance that radiates fast barotropic waves well before the
-                                     # much slower ~f⁻¹ geostrophic adjustment) can plausibly exceed.
+                                     # With Δt=30s and 60 substeps, the barotropic substep is 0.5s --
+                                     # comfortably within the ~2.7s forward-backward stability limit
+                                     # implied by this domain's gravity wave speed and grid spacing
+                                     # (Δx ≈ 104 m). That margin also covers the initial release-from-
+                                     # rest transient (an instantaneous pressure imbalance that
+                                     # radiates fast barotropic waves well before the much slower
+                                     # ~f⁻¹ geostrophic adjustment) -- though the front is now
+                                     # initialized in geostrophic balance (below) specifically to
+                                     # avoid relying on that margin to absorb such a transient.
                                      free_surface = SplitExplicitFreeSurface(grid, substeps=60),
                                      coriolis = FPlane(; f),
                                      buoyancy = SeawaterBuoyancy(; equation_of_state),
@@ -93,7 +94,7 @@ g = model.buoyancy.formulation.gravitational_acceleration
 N²   = 1e-5          # background stratification, s⁻²
 dTdz = N² / (g * α)
 
-Δy_front = 2kilometers
+Δy_front = 8kilometers
 ΔS       = 0.8
 mld      = 75meters
 noise    = 1e-3
@@ -127,17 +128,19 @@ uᵢ(x, y, z) = (g * β * ΔS / f) * ramp_derivative(y, Δy_front) * depth_mask_
 
 set!(model, T=Tᵢ, S=Sᵢ, u=uᵢ, η=ηᵢ, e=1e-6)
 
-simulation = Simulation(model, Δt=30seconds, stop_time=12hours)
+simulation = Simulation(model, Δt=30seconds, stop_time=2days)
 conjure_time_step_wizard!(simulation, IterationInterval(10), cfl=0.3, max_Δt=max_Δt)
 
 wall_clock = Ref(time_ns())
 
 function progress(sim)
-    u, v, w = sim.model.velocities
-    @printf("rank %d, iter: %d, time: %s, wall time: %s, max|u|: (%.2e, %.2e, %.2e) m/s, next Δt: %s\n",
-            rank, iteration(sim), prettytime(sim), prettytime(1e-9 * (time_ns() - wall_clock[])),
-            maximum(abs, u), maximum(abs, v), maximum(abs, w), prettytime(sim.Δt))
-    wall_clock[] = time_ns()
+    if rank == 0
+        u, v, w = sim.model.velocities
+        @info @sprintf("iter: %d, time: %s, wall time: %s, max|u|: (%.2e, %.2e, %.2e) m/s, next Δt: %s",
+                        iteration(sim), prettytime(sim), prettytime(1e-9 * (time_ns() - wall_clock[])),
+                        maximum(abs, u), maximum(abs, v), maximum(abs, w), prettytime(sim.Δt))
+        wall_clock[] = time_ns()
+    end
     return nothing
 end
 
