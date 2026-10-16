@@ -5,7 +5,7 @@
 #SBATCH --ntasks=2
 #SBATCH --gpus-per-task=1
 #SBATCH --cpus-per-task=1
-#SBATCH --time=00:15:00
+#SBATCH --time=01:00:00
 #SBATCH --output=mli-%j.out
 
 
