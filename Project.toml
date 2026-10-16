@@ -3,6 +3,9 @@ CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
 CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
 MPIPreferences = "3da0fdf6-3ccc-4f1b-acd9-58baa6c99267"
 Oceananigans = "9e8cae18-63c1-5223-a75c-80ca9d6e9a09"
+Polynomials = "f27b6e38-b328-58d1-80ce-0feddd5e7a45"
+SeawaterPolynomials = "d496a93d-167e-4197-9f49-d3af4ff8fe40"
+Zarr = "0a941bbe-ad1d-11e8-39d9-ab76183a1d99"
 
 [extras]
 CUDA_Compiler_jll = "d1e2174e-dfdc-576e-b43e-73b79eb1aca8"
